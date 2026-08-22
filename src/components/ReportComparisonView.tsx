@@ -452,36 +452,44 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
 
             {/* Chart Area */}
             <div className="h-72 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderRadius: '0.75rem',
-                      border: 'none',
-                      color: '#fff',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                  {allMarkerNames
-                    .filter((name) => selectedChartMetric === 'all' || selectedChartMetric === name)
-                    .map((markerName, index) => (
-                      <Line
-                        key={markerName}
-                        type="monotone"
-                        dataKey={markerName}
-                        stroke={chartColors[index % chartColors.length]}
-                        strokeWidth={2.5}
-                        activeDot={{ r: 6 }}
-                        connectNulls
-                      />
-                    ))}
-                </LineChart>
-              </ResponsiveContainer>
+              {allMarkerNames.length === 0 ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
+                  <AlertCircle className="w-8 h-8 mb-2 text-slate-300" />
+                  <p className="text-sm font-semibold">No Biomarkers Found</p>
+                  <p className="text-xs">The selected reports do not contain any recorded lab metrics to plot.</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        borderRadius: '0.75rem',
+                        border: 'none',
+                        color: '#fff',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                    {allMarkerNames
+                      .filter((name) => selectedChartMetric === 'all' || selectedChartMetric === name)
+                      .map((markerName, index) => (
+                        <Line
+                          key={markerName}
+                          type="monotone"
+                          dataKey={markerName}
+                          stroke={chartColors[index % chartColors.length]}
+                          strokeWidth={2.5}
+                          activeDot={{ r: 6 }}
+                          connectNulls
+                        />
+                      ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 

@@ -502,30 +502,36 @@ ${report.doctorNotes || 'None'}
                       />
                     </div>
                   ) : isPdf ? (
-                    <div className="w-full h-[550px] bg-slate-900 rounded-lg flex flex-col items-center justify-center p-6 text-white text-center">
-                      <FileText className="w-16 h-16 text-indigo-400 mb-3" />
-                      <h4 className="text-base font-bold">{report.fileName}</h4>
-                      <p className="text-xs text-slate-400 mt-1 mb-4">
-                        PDF Clinical Document loaded. Ready for viewing or printing.
-                      </p>
-                      <div className="flex gap-2">
-                        <a
-                          href={report.fileDataUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>Open in Full Tab</span>
-                        </a>
-                        <button
-                          onClick={handleDownload}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition"
-                        >
-                          <Download className="w-4 h-4" />
-                          <span>Download PDF</span>
-                        </button>
+                    <div className="w-full h-[600px] bg-slate-900 rounded-lg flex flex-col items-center justify-center p-2 text-white">
+                      <div className="w-full flex items-center justify-between px-4 pb-2">
+                        <div className="flex items-center gap-2">
+                           <FileText className="w-4 h-4 text-indigo-400" />
+                           <span className="text-sm font-semibold">{report.fileName}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <a
+                            href={report.fileDataUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold hover:bg-indigo-700 transition"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Open in Full Tab</span>
+                          </a>
+                          <button
+                            onClick={handleDownload}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-semibold hover:bg-slate-700 transition"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download PDF</span>
+                          </button>
+                        </div>
                       </div>
+                      <iframe
+                        src={`${report.fileDataUrl}#toolbar=0`}
+                        className="w-full h-full rounded border border-slate-700 bg-white"
+                        title={report.fileName}
+                      />
                     </div>
                   ) : (
                     <div className="w-full max-w-2xl bg-slate-900 p-4 rounded-lg text-slate-200 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[500px]">

@@ -148,6 +148,12 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
         const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
         setTitle(cleanName);
       }
+
+      // Auto-trigger extraction
+      setTimeout(() => {
+        const btn = document.getElementById('ai-auto-extract-btn');
+        if (btn) btn.click();
+      }, 500);
     } catch (err) {
       console.error('File parsing error:', err);
     }
@@ -169,6 +175,12 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
         const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
         setTitle(cleanName);
       }
+
+      // Auto-trigger extraction
+      setTimeout(() => {
+        const btn = document.getElementById('ai-auto-extract-btn');
+        if (btn) btn.click();
+      }, 500);
     } catch (err) {
       console.error('File drop parse error:', err);
     }
