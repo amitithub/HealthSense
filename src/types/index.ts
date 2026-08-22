@@ -83,21 +83,12 @@ export interface MedicalReport {
   orderingDoctor: string;
   status: ReportStatus;
   
-  // File details (primary attachment for backward compatibility)
+  // File details (supports any format)
   fileName: string;
-  fileType: string;
-  fileSize: number;
-  fileDataUrl?: string;
-  fileTextContent?: string;
-
-  // Additional attachments if multiple files are uploaded in one go
-  attachments?: Array<{
-    fileName: string;
-    fileType: string;
-    fileSize: number;
-    fileDataUrl?: string;
-    fileTextContent?: string;
-  }>;
+  fileType: string; // MIME type or extension like "application/pdf", "image/png", "text/csv", etc.
+  fileSize: number; // bytes
+  fileDataUrl?: string; // Base64 or Blob URL for preview
+  fileTextContent?: string; // Extracted raw text or document content
   
   // Lab / Diagnostic details
   markers: LabMarker[];

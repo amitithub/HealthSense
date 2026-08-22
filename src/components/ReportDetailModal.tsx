@@ -487,76 +487,58 @@ ${report.doctorNotes || 'None'}
               </div>
 
               {/* Viewer Canvas Container */}
-              <div className="bg-slate-950 rounded-xl p-4 min-h-[400px] max-h-[70vh] overflow-auto flex flex-col gap-6 items-center border border-slate-800">
-                {(report.attachments && report.attachments.length > 0
-                  ? report.attachments
-                  : [{
-                      fileName: report.fileName,
-                      fileType: report.fileType,
-                      fileDataUrl: report.fileDataUrl,
-                      fileTextContent: report.fileTextContent
-                    }]
-                ).map((att, idx) => {
-                  const attIsImage = att.fileType.startsWith('image/') || /\.(png|jpg|jpeg|webp|gif|bmp)$/i.test(att.fileName);
-                  const attIsPdf = att.fileType === 'application/pdf' || /\.pdf$/i.test(att.fileName);
-
-                  if (!att.fileDataUrl && !att.fileTextContent) {
-                    return (
-                      <div key={idx} className="w-full text-center p-8 text-slate-500 text-xs bg-slate-900 rounded-lg">
-                        <FileText className="w-12 h-12 mx-auto mb-2 text-slate-600" />
-                        <p className="font-semibold text-slate-400">{att.fileName}</p>
-                        <p className="mt-1">This report was recorded with direct lab metrics.</p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={idx} className="w-full flex flex-col items-center bg-slate-900/50 p-2 rounded-lg relative">
-                      <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded">
-                        {att.fileName}
-                      </div>
-                      {att.fileDataUrl ? (
-                        attIsImage ? (
-                          <div className="transition-transform duration-150 flex items-center justify-center pt-8">
-                            <img
-                              src={att.fileDataUrl}
-                              alt="Medical Document Scan"
-                              style={{
-                                transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                                filter: highContrast ? 'contrast(160%) brightness(95%) grayscale(20%)' : 'none',
-                              }}
-                              className="max-h-[550px] object-contain rounded shadow-lg"
-                            />
-                          </div>
-                        ) : attIsPdf ? (
-                          <div className="w-full h-[550px] bg-slate-900 rounded-lg flex flex-col items-center justify-center p-6 text-white text-center pt-8">
-                            <FileText className="w-16 h-16 text-indigo-400 mb-3" />
-                            <h4 className="text-base font-bold">{att.fileName}</h4>
-                            <div className="flex gap-2 mt-4">
-                              <a
-                                href={att.fileDataUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                                <span>Open in Full Tab</span>
-                              </a>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full max-w-2xl bg-slate-900 p-4 rounded-lg text-slate-200 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[500px] pt-8">
-                            {att.fileTextContent || 'File uploaded.'}
-                          </div>
-                        )
-                      ) : (
-                        <div className="w-full max-w-2xl bg-slate-900 p-4 rounded-lg text-slate-200 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[500px] pt-8">
-                          {att.fileTextContent || 'Text file content rendered.'}
-                        </div>
-                      )}
+              <div className="bg-slate-950 rounded-xl p-4 min-h-[400px] max-h-[600px] overflow-auto flex items-center justify-center border border-slate-800">
+                {report.fileDataUrl ? (
+                  isImage ? (
+                    <div className="transition-transform duration-150 flex items-center justify-center">
+                      <img
+                        src={report.fileDataUrl}
+                        alt="Medical Document Scan"
+                        style={{
+                          transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                          filter: highContrast ? 'contrast(160%) brightness(95%) grayscale(20%)' : 'none',
+                        }}
+                        className="max-h-[550px] object-contain rounded shadow-lg"
+                      />
                     </div>
-                  );
-                })}
+                  ) : isPdf ? (
+                    <div className="w-full h-[550px] bg-slate-900 rounded-lg flex flex-col items-center justify-center p-6 text-white text-center">
+                      <FileText className="w-16 h-16 text-indigo-400 mb-3" />
+                      <h4 className="text-base font-bold">{report.fileName}</h4>
+                      <p className="text-xs text-slate-400 mt-1 mb-4">
+                        PDF Clinical Document loaded. Ready for viewing or printing.
+                      </p>
+                      <div className="flex gap-2">
+                        <a
+                          href={report.fileDataUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>Open in Full Tab</span>
+                        </a>
+                        <button
+                          onClick={handleDownload}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Download PDF</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full max-w-2xl bg-slate-900 p-4 rounded-lg text-slate-200 text-xs font-mono whitespace-pre-wrap overflow-auto max-h-[500px]">
+                      {report.fileTextContent || 'Text file content rendered.'}
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center p-8 text-slate-500 text-xs">
+                    <FileText className="w-12 h-12 mx-auto mb-2 text-slate-600" />
+                    <p className="font-semibold text-slate-400">{report.fileName}</p>
+                    <p className="mt-1">This report was recorded with direct lab metrics.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
