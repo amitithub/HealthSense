@@ -116,7 +116,24 @@ export class StorageService {
     try {
       localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
     } catch (e) {
-      console.error('Failed to save reports:', e);
+      console.warn('LocalStorage full, attempting quota fallback compression...', e);
+      try {
+        // Fallback 1: Keep fileDataUrl for the newest report, strip from older to fit in quota
+        const compressed = reports.map((r, idx) => {
+          if (idx > 0 && r.fileDataUrl && r.fileDataUrl.length > 50000) {
+            return { ...r, fileDataUrl: '' };
+          }
+          return r;
+        });
+        localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(compressed));
+      } catch (err2) {
+        // Fallback 2: Strip all heavy base64 strings so all reports and biomarkers are 100% saved!
+        const metadataOnly = reports.map((r) => ({
+          ...r,
+          fileDataUrl: '',
+        }));
+        localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(metadataOnly));
+      }
     }
   }
 
