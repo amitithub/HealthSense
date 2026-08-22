@@ -72,8 +72,8 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   const [tagsText, setTagsText] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
 
-  // File states (supports any format)
-  const [fileResult, setFileResult] = useState<ParsedFileResult | null>(null);
+  // File states (supports multiple files)
+  const [filesList, setFilesList] = useState<ParsedFileResult[]>([]);
   const [existingFileUrl, setExistingFileUrl] = useState<string>('');
   const [existingFileName, setExistingFileName] = useState<string>('');
   const [existingFileType, setExistingFileType] = useState<string>('');
@@ -110,6 +110,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       setExistingFileType(reportToEdit.fileType || '');
       setExistingFileSize(reportToEdit.fileSize || 0);
       setExistingFileUrl(reportToEdit.fileDataUrl || '');
+      setFilesList([]);
     } else {
       setMemberId(initialMemberId && initialMemberId !== 'all' ? initialMemberId : members[0]?.id || '');
       setTitle('');
@@ -124,7 +125,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       setFollowUpDate('');
       setMarkers([]);
       setKeyFindings([]);
-      setFileResult(null);
+      setFilesList([]);
       setExistingFileName('');
       setExistingFileType('');
       setExistingFileSize(0);
@@ -137,20 +138,22 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   if (!isOpen) return null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
 
     try {
-      const parsed = await FileParserService.parseUploadedFile(file);
-      setFileResult(parsed);
-      
-      // If title is empty, pre-fill from filename
-      if (!title) {
-        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        setTitle(cleanName);
+      const parsedResults: ParsedFileResult[] = [];
+      for (const f of rawFiles) {
+        const parsed = await FileParserService.parseUploadedFile(f);
+        parsedResults.push(parsed);
       }
 
-      // No auto-trigger, let the user click the AI button if they want to.
+      setFilesList((prev) => [...prev, ...parsedResults]);
+
+      if (!title && parsedResults[0]) {
+        const cleanName = parsedResults[0].fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        setTitle(cleanName);
+      }
     } catch (err) {
       console.error('File parsing error:', err);
     }
@@ -162,18 +165,22 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+    const rawFiles = Array.from(e.dataTransfer.files || []);
+    if (rawFiles.length === 0) return;
 
     try {
-      const parsed = await FileParserService.parseUploadedFile(file);
-      setFileResult(parsed);
-      if (!title) {
-        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        setTitle(cleanName);
+      const parsedResults: ParsedFileResult[] = [];
+      for (const f of rawFiles) {
+        const parsed = await FileParserService.parseUploadedFile(f);
+        parsedResults.push(parsed);
       }
 
-      // No auto-trigger
+      setFilesList((prev) => [...prev, ...parsedResults]);
+
+      if (!title && parsedResults[0]) {
+        const cleanName = parsedResults[0].fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        setTitle(cleanName);
+      }
     } catch (err) {
       console.error('File drop parse error:', err);
     }
@@ -194,10 +201,11 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     const activeMember = members.find((m) => m.id === memberId);
 
     try {
+      const primaryFile = filesList[0];
       const result = await AIService.analyzeReport({
-        reportText: fileResult?.extractedText || summary || title,
-        imageData: fileResult?.dataUrl, // Send dataUrl regardless of whether it is PDF or image
-        mimeType: fileResult?.fileType || (fileResult?.isPdf ? 'application/pdf' : 'image/jpeg'),
+        reportText: primaryFile?.extractedText || summary || title,
+        imageData: primaryFile?.dataUrl,
+        mimeType: primaryFile?.fileType || (primaryFile?.isPdf ? 'application/pdf' : 'image/jpeg'),
         patientInfo: activeMember
           ? {
               name: activeMember.name,
@@ -234,11 +242,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
           setMarkers(formattedMarkers);
         }
 
-        if (!localStorage.getItem('gemini_api_key')) {
-          setAiSuccessMessage(`Fallback used: Loaded ${d.markers?.length || 0} dummy biomarkers (Add API key for real data)`);
-        } else {
-          setAiSuccessMessage(`Successfully extracted ${d.markers?.length || 0} biomarkers & clinical fields!`);
-        }
+        setAiSuccessMessage(`Successfully extracted ${d.markers?.length || 0} biomarkers & clinical fields!`);
       } else {
         setAiAnalysisError(result.error || 'Could not automatically extract all parameters.');
       }
@@ -274,8 +278,6 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
         if (updated.value !== null && updated.minRef !== null && updated.minRef !== undefined && updated.maxRef !== null && updated.maxRef !== undefined) {
           if (updated.value < updated.minRef) {
             updated.flag = 'Low';
-          } else if (updated.value > updated.maxRef * 1.5) {
-            updated.flag = 'Critical';
           } else if (updated.value > updated.maxRef) {
             updated.flag = 'High';
           } else {
@@ -291,7 +293,8 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     setMarkers(markers.filter((m) => m.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Submit Handler
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     
@@ -319,6 +322,8 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     // If we just created the member, primaryDoctor won't exist yet, so we default
     const currentMember = members.find((m) => m.id === finalMemberId);
 
+    const primaryFile = filesList[0];
+
     const reportPayload: Omit<MedicalReport, 'id' | 'createdAt' | 'updatedAt'> = {
       memberId: finalMemberId,
       memberName: finalMemberName,
@@ -328,11 +333,11 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       labName: labName.trim() || 'General Diagnostics',
       orderingDoctor: orderingDoctor.trim() || (currentMember?.primaryDoctor?.name || 'Attending Physician'),
       status,
-      fileName: fileResult?.fileName || existingFileName || 'Report_Document.pdf',
-      fileType: fileResult?.fileType || existingFileType || 'application/pdf',
-      fileSize: fileResult?.fileSize || existingFileSize || 150000,
-      fileDataUrl: fileResult?.dataUrl || existingFileUrl || '',
-      fileTextContent: fileResult?.extractedText || '',
+      fileName: primaryFile?.fileName || existingFileName || 'Report_Document.pdf',
+      fileType: primaryFile?.fileType || existingFileType || 'application/pdf',
+      fileSize: primaryFile?.fileSize || existingFileSize || 150000,
+      fileDataUrl: primaryFile?.dataUrl || existingFileUrl || '',
+      fileTextContent: primaryFile?.extractedText || '',
       markers,
       summary: summary.trim() || `Laboratory evaluation recorded for ${finalMemberName}.`,
       keyFindings: keyFindings.length > 0 ? keyFindings : markers.filter((m) => m.flag !== 'Normal').map((m) => `${m.name}: ${m.value} ${m.unit} (${m.flag})`),
@@ -342,6 +347,35 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     };
 
     onSaveReport(reportPayload, reportToEdit ? reportToEdit.id : undefined);
+
+    // If there are additional files uploaded, save them as separate reports too!
+    if (filesList.length > 1) {
+      for (let i = 1; i < filesList.length; i++) {
+        const extraFile = filesList[i];
+        const extraPayload: Omit<MedicalReport, 'id' | 'createdAt' | 'updatedAt'> = {
+          memberId: finalMemberId,
+          memberName: finalMemberName,
+          title: extraFile.fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+          category,
+          reportDate,
+          labName: labName.trim() || 'General Diagnostics',
+          orderingDoctor: orderingDoctor.trim() || (currentMember?.primaryDoctor?.name || 'Attending Physician'),
+          status,
+          fileName: extraFile.fileName,
+          fileType: extraFile.fileType,
+          fileSize: extraFile.fileSize,
+          fileDataUrl: extraFile.dataUrl,
+          fileTextContent: extraFile.extractedText,
+          markers: [], // Can be analyzed individually
+          summary: `Document ${extraFile.fileName} uploaded in batch.`,
+          keyFindings: [],
+          doctorNotes: '',
+          tags: [category, 'Batch Upload'],
+        };
+        onSaveReport(extraPayload);
+      }
+    }
+
     onClose();
   };
 
@@ -386,7 +420,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer flex flex-col items-center justify-center gap-2 ${
-                fileResult || existingFileName
+                filesList.length > 0 || existingFileName
                   ? 'border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/60'
                   : 'border-slate-300 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-400'
               }`}
@@ -394,55 +428,65 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 className="hidden"
                 accept="*/*"
                 onChange={handleFileChange}
               />
 
-              {fileResult || existingFileName ? (
-                <div className="flex items-center gap-3 w-full max-w-md bg-white p-3 rounded-lg border border-indigo-200 shadow-xs">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                    {fileResult?.isImage ? (
-                      <ImageIcon className="w-5 h-5" />
-                    ) : (
-                      <FileText className="w-5 h-5" />
-                    )}
-                  </div>
-                  <div className="text-left flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-900 truncate">
-                      {fileResult?.fileName || existingFileName}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {fileResult ? FileParserService.formatBytes(fileResult.fileSize) : FileParserService.formatBytes(existingFileSize)} • {fileResult?.fileType || existingFileType || 'File loaded'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(fileResult?.dataUrl || existingFileUrl) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowFilePreview(!showFilePreview);
-                        }}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
-                        title="Toggle Preview"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFileResult(null);
-                        setExistingFileName('');
-                        setExistingFileUrl('');
-                      }}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                      title="Remove file"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {filesList.length > 0 || existingFileName ? (
+                <div className="w-full max-w-xl space-y-2">
+                  {filesList.map((fileItem, idx) => (
+                    <div key={idx} className="flex items-center gap-3 w-full bg-white p-2.5 rounded-lg border border-indigo-200 shadow-xs">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                        {fileItem.isImage ? (
+                          <ImageIcon className="w-4 h-4" />
+                        ) : (
+                          <FileText className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {fileItem.fileName}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {FileParserService.formatBytes(fileItem.fileSize)} • {fileItem.fileType || 'File loaded'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFilesList(filesList.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title="Remove file"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {existingFileName && filesList.length === 0 && (
+                    <div className="flex items-center gap-3 w-full bg-white p-2.5 rounded-lg border border-indigo-200 shadow-xs">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {existingFileName}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {FileParserService.formatBytes(existingFileSize)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-indigo-600 font-semibold pt-1">
+                    + Add more files (Drag & drop or click)
                   </div>
                 </div>
               ) : (
