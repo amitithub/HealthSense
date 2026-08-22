@@ -72,12 +72,9 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   const [tagsText, setTagsText] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
 
-  // File states (supports any format)
-  const [fileResult, setFileResult] = useState<ParsedFileResult | null>(null);
-  const [existingFileUrl, setExistingFileUrl] = useState<string>('');
-  const [existingFileName, setExistingFileName] = useState<string>('');
-  const [existingFileType, setExistingFileType] = useState<string>('');
-  const [existingFileSize, setExistingFileSize] = useState<number>(0);
+  // File states (supports multiple files)
+  const [fileResults, setFileResults] = useState<ParsedFileResult[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
   const [showFilePreview, setShowFilePreview] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,10 +102,21 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       setFollowUpDate(reportToEdit.followUpDate || '');
       setMarkers(reportToEdit.markers || []);
       setKeyFindings(reportToEdit.keyFindings || []);
-      setExistingFileName(reportToEdit.fileName || '');
-      setExistingFileType(reportToEdit.fileType || '');
-      setExistingFileSize(reportToEdit.fileSize || 0);
-      setExistingFileUrl(reportToEdit.fileDataUrl || '');
+      
+      const attachments = [];
+      if (reportToEdit.fileName) {
+        attachments.push({
+          fileName: reportToEdit.fileName,
+          fileType: reportToEdit.fileType,
+          fileSize: reportToEdit.fileSize,
+          fileDataUrl: reportToEdit.fileDataUrl,
+          fileTextContent: reportToEdit.fileTextContent
+        });
+      }
+      if (reportToEdit.attachments) {
+        attachments.push(...reportToEdit.attachments);
+      }
+      setExistingAttachments(attachments);
     } else {
       setMemberId(initialMemberId && initialMemberId !== 'all' ? initialMemberId : members[0]?.id || '');
       setTitle('');
@@ -123,11 +131,8 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       setFollowUpDate('');
       setMarkers([]);
       setKeyFindings([]);
-      setFileResult(null);
-      setExistingFileName('');
-      setExistingFileType('');
-      setExistingFileSize(0);
-      setExistingFileUrl('');
+      setFileResults([]);
+      setExistingAttachments([]);
     }
     setAiAnalysisError(null);
     setAiSuccessMessage(null);
@@ -136,16 +141,16 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   if (!isOpen) return null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
     try {
-      const parsed = await FileParserService.parseUploadedFile(file);
-      setFileResult(parsed);
+      const parsedFiles = await Promise.all(files.map(f => FileParserService.parseUploadedFile(f)));
+      setFileResults([...fileResults, ...parsedFiles]);
       
-      // If title is empty, pre-fill from filename
-      if (!title) {
-        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      // If title is empty, pre-fill from first filename
+      if (!title && parsedFiles[0]) {
+        const cleanName = parsedFiles[0].fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
         setTitle(cleanName);
       }
     } catch (err) {
@@ -159,14 +164,15 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.dataTransfer.files || []);
+    if (!files.length) return;
 
     try {
-      const parsed = await FileParserService.parseUploadedFile(file);
-      setFileResult(parsed);
-      if (!title) {
-        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      const parsedFiles = await Promise.all(files.map(f => FileParserService.parseUploadedFile(f)));
+      setFileResults([...fileResults, ...parsedFiles]);
+      
+      if (!title && parsedFiles[0]) {
+        const cleanName = parsedFiles[0].fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
         setTitle(cleanName);
       }
     } catch (err) {
@@ -176,6 +182,14 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
 
   // Run AI extraction
   const handleAIExtract = async () => {
+    let apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+      const input = window.prompt("To use AI extraction on this static site, please enter your Gemini API Key.\nGet one for free at aistudio.google.com/app/apikey");
+      if (!input) return;
+      localStorage.setItem('gemini_api_key', input.trim());
+      apiKey = input.trim();
+    }
+
     setIsAnalyzingAI(true);
     setAiAnalysisError(null);
     setAiSuccessMessage(null);
@@ -183,10 +197,28 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     const activeMember = members.find((m) => m.id === memberId);
 
     try {
+      const allText = [
+        summary,
+        title,
+        ...existingAttachments.map(a => a.fileTextContent || ''),
+        ...fileResults.map(f => f.extractedText || '')
+      ].filter(Boolean).join('\n\n');
+
+      const images: Array<{ data: string, mimeType: string }> = [];
+      existingAttachments.forEach(a => {
+        if (a.fileDataUrl && a.fileType.startsWith('image/')) {
+          images.push({ data: a.fileDataUrl, mimeType: a.fileType });
+        }
+      });
+      fileResults.forEach(f => {
+        if (f.isImage && f.dataUrl) {
+          images.push({ data: f.dataUrl, mimeType: f.fileType });
+        }
+      });
+
       const result = await AIService.analyzeReport({
-        reportText: fileResult?.extractedText || summary || title,
-        imageData: fileResult?.isImage ? fileResult.dataUrl : undefined,
-        mimeType: fileResult?.fileType,
+        reportText: allText,
+        images,
         patientInfo: activeMember
           ? {
               name: activeMember.name,
@@ -229,6 +261,11 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       }
     } catch (err: any) {
       setAiAnalysisError(err.message || 'AI extraction failed.');
+      // Remove invalid key
+      if (err.message.includes('400') || err.message.includes('401') || err.message.includes('403')) {
+        localStorage.removeItem('gemini_api_key');
+        setAiAnalysisError('Invalid API Key. Please try again.');
+      }
     } finally {
       setIsAnalyzingAI(false);
     }
@@ -304,6 +341,26 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     // If we just created the member, primaryDoctor won't exist yet, so we default
     const currentMember = members.find((m) => m.id === finalMemberId);
 
+    // Combine all files for saving
+    const allAttachments = [
+      ...existingAttachments,
+      ...fileResults.map(f => ({
+        fileName: f.fileName,
+        fileType: f.fileType,
+        fileSize: f.fileSize,
+        fileDataUrl: f.dataUrl,
+        fileTextContent: f.extractedText
+      }))
+    ];
+
+    const primaryAttachment = allAttachments[0] || {
+      fileName: 'Report_Document.pdf',
+      fileType: 'application/pdf',
+      fileSize: 150000,
+      fileDataUrl: '',
+      fileTextContent: ''
+    };
+
     const reportPayload: Omit<MedicalReport, 'id' | 'createdAt' | 'updatedAt'> = {
       memberId: finalMemberId,
       memberName: finalMemberName,
@@ -313,11 +370,12 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       labName: labName.trim() || 'General Diagnostics',
       orderingDoctor: orderingDoctor.trim() || (currentMember?.primaryDoctor?.name || 'Attending Physician'),
       status,
-      fileName: fileResult?.fileName || existingFileName || 'Report_Document.pdf',
-      fileType: fileResult?.fileType || existingFileType || 'application/pdf',
-      fileSize: fileResult?.fileSize || existingFileSize || 150000,
-      fileDataUrl: fileResult?.dataUrl || existingFileUrl || '',
-      fileTextContent: fileResult?.extractedText || '',
+      fileName: primaryAttachment.fileName,
+      fileType: primaryAttachment.fileType,
+      fileSize: primaryAttachment.fileSize,
+      fileDataUrl: primaryAttachment.fileDataUrl,
+      fileTextContent: primaryAttachment.fileTextContent,
+      attachments: allAttachments,
       markers,
       summary: summary.trim() || `Laboratory evaluation recorded for ${finalMemberName}.`,
       keyFindings: keyFindings.length > 0 ? keyFindings : markers.filter((m) => m.flag !== 'Normal').map((m) => `${m.name}: ${m.value} ${m.unit} (${m.flag})`),
@@ -371,7 +429,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-5 text-center transition cursor-pointer flex flex-col items-center justify-center gap-2 ${
-                fileResult || existingFileName
+                fileResults.length > 0 || existingAttachments.length > 0
                   ? 'border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/60'
                   : 'border-slate-300 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-400'
               }`}
@@ -379,55 +437,65 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 className="hidden"
                 accept="*/*"
                 onChange={handleFileChange}
               />
 
-              {fileResult || existingFileName ? (
-                <div className="flex items-center gap-3 w-full max-w-md bg-white p-3 rounded-lg border border-indigo-200 shadow-xs">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                    {fileResult?.isImage ? (
-                      <ImageIcon className="w-5 h-5" />
-                    ) : (
-                      <FileText className="w-5 h-5" />
-                    )}
-                  </div>
-                  <div className="text-left flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-900 truncate">
-                      {fileResult?.fileName || existingFileName}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {fileResult ? FileParserService.formatBytes(fileResult.fileSize) : FileParserService.formatBytes(existingFileSize)} • {fileResult?.fileType || existingFileType || 'File loaded'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {(fileResult?.dataUrl || existingFileUrl) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowFilePreview(!showFilePreview);
-                        }}
-                        className="p-1.5 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
-                        title="Toggle Preview"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFileResult(null);
-                        setExistingFileName('');
-                        setExistingFileUrl('');
-                      }}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                      title="Remove file"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {fileResults.length > 0 || existingAttachments.length > 0 ? (
+                <div className="flex flex-col gap-2 w-full max-w-xl">
+                  {[...existingAttachments, ...fileResults].map((f, i) => (
+                    <div key={i} className="flex items-center gap-3 w-full bg-white dark:bg-slate-800 p-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 shadow-xs">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        {f.isImage || f.fileType?.startsWith('image/') ? (
+                          <ImageIcon className="w-5 h-5" />
+                        ) : (
+                          <FileText className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="text-left flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {f.fileName}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {FileParserService.formatBytes(f.fileSize || 0)} • {f.fileType || 'File loaded'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {(f.dataUrl || f.fileDataUrl) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowFilePreview(!showFilePreview);
+                            }}
+                            className="p-1.5 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/50"
+                            title="Toggle Preview"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (f.dataUrl) {
+                              setFileResults(fileResults.filter(r => r !== f));
+                            } else {
+                              setExistingAttachments(existingAttachments.filter(a => a !== f));
+                            }
+                          }}
+                          className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30"
+                          title="Remove file"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-xs text-indigo-600 font-semibold mt-2 cursor-pointer hover:underline">
+                    + Add more files
                   </div>
                 </div>
               ) : (
