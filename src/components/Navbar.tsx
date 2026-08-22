@@ -13,13 +13,14 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { FamilyMember } from '../types';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
   members: FamilyMember[];
   selectedMemberId: string; // 'all' or member.id
   onSelectMember: (id: string) => void;
-  activeTab: 'reports' | 'compare' | 'trends' | 'doctor-share' | 'members';
-  onChangeTab: (tab: 'reports' | 'compare' | 'trends' | 'doctor-share' | 'members') => void;
+  activeTab: 'reports' | 'compare' | 'trends' | 'doctor-share' | 'members' | 'chart-builder';
+  onChangeTab: (tab: 'reports' | 'compare' | 'trends' | 'doctor-share' | 'members' | 'chart-builder') => void;
   onOpenUpload: () => void;
   onOpenManageMembers: () => void;
   onOpenBackup: () => void;
@@ -42,27 +43,27 @@ export const Navbar: React.FC<NavbarProps> = ({
   const selectedMember = members.find((m) => m.id === selectedMemberId);
 
   return (
-    <header id="main-header" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <header id="main-header" className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
       {/* Top Banner / Brand & Global Controls */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           
           {/* Logo & Title */}
           <div className="flex items-center gap-3 shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 dark:shadow-none">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">
-                  Health<span className="text-indigo-600">Sense</span>
+                <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
+                  Health<span className="text-indigo-600 dark:text-indigo-400">Sense</span>
                 </h1>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                  Clinical & Doctor Share
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/50">
+                  Dashboard
                 </span>
               </div>
-              <p className="text-xs text-slate-500 hidden md:block">
-                Track, Compare & Share Family Medical Reports
+              <p className="text-xs text-slate-500 dark:text-slate-400 hidden md:block">
+                Track, Compare & Analyze Medical Reports
               </p>
             </div>
           </div>
@@ -76,14 +77,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search reports, lab markers (e.g. HbA1c, Lipids), doctors..."
-                className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+                placeholder="Search reports, lab markers (e.g. HbA1c, Lipids)..."
+                className="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition"
               />
               {searchQuery && (
                 <button
                   id="clear-search-btn"
                   onClick={() => onSearchChange('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-full w-4 h-4 flex items-center justify-center"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-full w-4 h-4 flex items-center justify-center"
                 >
                   ×
                 </button>
@@ -109,18 +110,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="header-members-manage-btn"
               onClick={onOpenManageMembers}
               title="Manage Family Profiles"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium transition cursor-pointer"
             >
-              <Users className="w-4 h-4 text-slate-600" />
-              <span className="hidden lg:inline">Family Profiles</span>
+              <Users className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+              <span className="hidden lg:inline">Profiles</span>
             </button>
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
 
             {/* Data backup / Sample reset */}
             <button
               id="header-backup-btn"
               onClick={onOpenBackup}
-              title="Backup & Database Settings"
-              className="p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+              title="Settings & Backup"
+              className="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
             >
               <Database className="w-5 h-5" />
             </button>
@@ -128,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Secondary Sub-Navbar: Family Member Selector & Views Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 border-t border-slate-100 gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 border-t border-slate-100 dark:border-slate-800 gap-3">
           
           {/* Family Member Pill Selector */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-thin">
@@ -176,14 +180,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Navigation View Tabs */}
-          <nav id="header-nav-tabs" className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto shrink-0">
+          <nav id="header-nav-tabs" className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg self-start sm:self-auto shrink-0 transition-colors duration-200">
             <button
               id="nav-tab-reports"
               onClick={() => onChangeTab('reports')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'reports'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -195,8 +199,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onChangeTab('compare')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'compare'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <GitCompare className="w-3.5 h-3.5" />
@@ -204,16 +208,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
-              id="nav-tab-trends"
-              onClick={() => onChangeTab('trends')}
+              id="nav-tab-chart-builder"
+              onClick={() => onChangeTab('chart-builder')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                activeTab === 'trends'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                activeTab === 'chart-builder'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
-              <span>Biomarker Trends</span>
+              <span>Chart Builder</span>
             </button>
 
             <button
@@ -221,8 +225,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onChangeTab('doctor-share')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'doctor-share'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-emerald-700 hover:bg-emerald-50'
+                  ? 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-xs'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'
               }`}
             >
               <Share2 className="w-3.5 h-3.5" />

@@ -33,6 +33,7 @@ import { ReportDetailModal } from './components/ReportDetailModal';
 import { ReportComparisonView } from './components/ReportComparisonView';
 import { DoctorShareView } from './components/DoctorShareView';
 import { FamilyMemberManager } from './components/FamilyMemberManager';
+import { ChartBuilder } from './components/ChartBuilder';
 
 const ALL_CATEGORIES: Array<{ label: string; value: string }> = [
   { label: 'All Categories', value: 'all' },
@@ -51,7 +52,7 @@ const ALL_CATEGORIES: Array<{ label: string; value: string }> = [
 
 export default function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'vault' | 'compare' | 'doctor' | 'members'>('vault');
+  const [activeTab, setActiveTab] = useState<'vault' | 'compare' | 'doctor' | 'members' | 'chart-builder'>('vault');
 
   // Core Data States
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -216,20 +217,29 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white transition-colors duration-200">
       
       {/* Top Main Navigation */}
       <Navbar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        activeTab={activeTab === 'vault' ? 'reports' : activeTab === 'doctor' ? 'doctor-share' : activeTab as any}
+        onChangeTab={(tab) => {
+          if (tab === 'reports') setActiveTab('vault');
+          else if (tab === 'doctor-share') setActiveTab('doctor');
+          else if (tab === 'compare') setActiveTab('compare');
+          else if (tab === 'members') setActiveTab('members');
+          else if (tab === 'chart-builder') setActiveTab('chart-builder');
+        }}
         members={members}
         selectedMemberId={selectedMemberId}
         onSelectMember={setSelectedMemberId}
-        onOpenUploadModal={() => {
+        onOpenUpload={() => {
           setReportToEdit(null);
           setIsUploadModalOpen(true);
         }}
-        onOpenMembersModal={() => setIsMemberManagerOpen(true)}
+        onOpenManageMembers={() => setIsMemberManagerOpen(true)}
+        onOpenBackup={() => showToast('Backup coming soon', 'info')}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Main App Container */}
@@ -591,6 +601,11 @@ export default function App() {
             selectedMemberId={selectedMemberId}
             onSelectMember={setSelectedMemberId}
           />
+        )}
+
+        {/* ================= VIEW: CHART BUILDER ================= */}
+        {activeTab === 'chart-builder' && (
+          <ChartBuilder reports={reports} selectedMemberId={selectedMemberId} />
         )}
 
         {/* ================= VIEW 4: FAMILY MEMBERS PROFILE MANAGER ================= */}
