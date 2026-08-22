@@ -138,7 +138,7 @@ Return a valid JSON object matching this schema:
 `;
       parts.push({ text: promptText });
 
-      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-flash-latest'];
+      const modelsToTry = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.6-flash'];
       let lastError: any = null;
 
       for (const modelName of modelsToTry) {
