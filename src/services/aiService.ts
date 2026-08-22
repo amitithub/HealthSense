@@ -58,6 +58,16 @@ export class AIService {
       };
     } catch (err: any) {
       console.warn('AI report analysis fallback:', err);
+      
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (apiKey) {
+        // If they provided a key and it failed, tell them why instead of falling back to dummy data
+        return {
+          success: false,
+          error: err.message || 'Gemini API call failed.',
+        };
+      }
+
       return {
         success: true,
         data: this.fallbackLocalAnalyze(payload.reportText),
@@ -117,7 +127,7 @@ Return a valid JSON object matching this schema:
 `;
       parts.push({ text: promptText });
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
