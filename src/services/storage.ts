@@ -540,7 +540,7 @@ export class StorageService {
     const payload = {
       version: '1.0',
       exportDate: new Date().toISOString(),
-      appName: 'Family Health Report Tracker',
+      appName: 'HealthSense',
       members: this.getMembers(),
       reports: this.getReports(),
     };

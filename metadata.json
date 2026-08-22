@@ -1,5 +1,5 @@
 {
-  "name": "Family Health Report Tracker & Doctor Compare",
+  "name": "HealthSense",
   "description": "Interactive family medical records and lab report tracker with side-by-side comparison, biomarker trends, file upload for any format, and clinical summaries ready to share with doctors.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
