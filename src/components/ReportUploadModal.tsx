@@ -30,6 +30,7 @@ interface ReportUploadModalProps {
   initialMemberId?: string;
   reportToEdit?: MedicalReport | null;
   onSaveReport: (reportData: Omit<MedicalReport, 'id' | 'createdAt' | 'updatedAt'>, editId?: string) => void;
+  onCreateMember?: (name: string) => string;
 }
 
 const CATEGORIES: ReportCategory[] = [
@@ -55,7 +56,10 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   initialMemberId,
   reportToEdit,
   onSaveReport,
+  onCreateMember,
 }) => {
+  const [isAddingNewMember, setIsAddingNewMember] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
   const [memberId, setMemberId] = useState<string>(initialMemberId || members[0]?.id || '');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ReportCategory>('Blood Test');
@@ -275,23 +279,39 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    
+    let finalMemberId = memberId;
+    let finalMemberName = '';
 
-    const selectedMember = members.find((m) => m.id === memberId);
-    const memberName = selectedMember ? selectedMember.name : 'Unknown';
+    if (isAddingNewMember || members.length === 0) {
+      if (!newMemberName.trim()) return; // Required
+      if (onCreateMember) {
+        finalMemberId = onCreateMember(newMemberName.trim());
+        finalMemberName = newMemberName.trim();
+      }
+    } else {
+      const selectedMember = members.find((m) => m.id === finalMemberId);
+      finalMemberName = selectedMember ? selectedMember.name : 'Unknown';
+    }
+
+    if (!finalMemberId) return;
 
     const tags = tagsText
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
 
+    // If we just created the member, primaryDoctor won't exist yet, so we default
+    const currentMember = members.find((m) => m.id === finalMemberId);
+
     const reportPayload: Omit<MedicalReport, 'id' | 'createdAt' | 'updatedAt'> = {
-      memberId,
-      memberName,
+      memberId: finalMemberId,
+      memberName: finalMemberName,
       title: title.trim(),
       category,
       reportDate,
       labName: labName.trim() || 'General Diagnostics',
-      orderingDoctor: orderingDoctor.trim() || (selectedMember?.primaryDoctor?.name || 'Attending Physician'),
+      orderingDoctor: orderingDoctor.trim() || (currentMember?.primaryDoctor?.name || 'Attending Physician'),
       status,
       fileName: fileResult?.fileName || existingFileName || 'Report_Document.pdf',
       fileType: fileResult?.fileType || existingFileType || 'application/pdf',
@@ -299,7 +319,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
       fileDataUrl: fileResult?.dataUrl || existingFileUrl || '',
       fileTextContent: fileResult?.extractedText || '',
       markers,
-      summary: summary.trim() || `Laboratory evaluation recorded for ${memberName}.`,
+      summary: summary.trim() || `Laboratory evaluation recorded for ${finalMemberName}.`,
       keyFindings: keyFindings.length > 0 ? keyFindings : markers.filter((m) => m.flag !== 'Normal').map((m) => `${m.name}: ${m.value} ${m.unit} (${m.flag})`),
       doctorNotes: doctorNotes.trim(),
       tags: tags.length > 0 ? tags : [category],
@@ -516,23 +536,59 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 text-sm">
               {/* Family Member */}
+              {/* Family Member */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Family Member *
                 </label>
-                <select
-                  id="report-form-member"
-                  required
-                  value={memberId}
-                  onChange={(e) => setMemberId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none"
-                >
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({m.relationship})
+                {isAddingNewMember || members.length === 0 ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={newMemberName}
+                      onChange={(e) => setNewMemberName(e.target.value)}
+                      placeholder="Enter patient name..."
+                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none"
+                    />
+                    {members.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingNewMember(false);
+                          setMemberId(members[0]?.id || '');
+                        }}
+                        className="px-2 py-2 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+                        title="Cancel adding new member"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <select
+                    id="report-form-member"
+                    required
+                    value={memberId}
+                    onChange={(e) => {
+                      if (e.target.value === 'ADD_NEW') {
+                        setIsAddingNewMember(true);
+                      } else {
+                        setMemberId(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none"
+                  >
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.relationship})
+                      </option>
+                    ))}
+                    <option value="ADD_NEW" className="font-bold text-indigo-600">
+                      + Add New Profile...
                     </option>
-                  ))}
-                </select>
+                  </select>
+                )}
               </div>
 
               {/* Title */}

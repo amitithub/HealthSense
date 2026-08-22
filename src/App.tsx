@@ -644,6 +644,18 @@ export default function App() {
         initialMemberId={selectedMemberId !== 'all' ? selectedMemberId : members[0]?.id}
         reportToEdit={reportToEdit}
         onSaveReport={handleSaveReport}
+        onCreateMember={(name) => {
+          const newMember = {
+            name,
+            relationship: 'Self',
+            allergies: [],
+            conditions: [],
+            medications: [],
+          };
+          const savedMember = StorageService.addMember(newMember);
+          refreshData();
+          return savedMember.id;
+        }}
       />
 
       {/* 2. Full Detailed Clinical Report Inspector */}
