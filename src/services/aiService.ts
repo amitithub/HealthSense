@@ -79,45 +79,56 @@ export class AIService {
     try {
       const parts: any[] = [];
       
-      if (payload.images && payload.images.length > 0) {
-        for (const img of payload.images) {
-          const cleanBase64 = img.data.replace(/^data:image\/[a-z]+;base64,/, "");
-          parts.push({
-            inlineData: { mimeType: img.mimeType, data: cleanBase64 }
-          });
-        }
-      } else if (payload.imageData && payload.mimeType) {
-        const cleanBase64 = payload.imageData.replace(/^data:image\/[a-z]+;base64,/, "");
+      const fileData = payload.imageData || payload.fileData;
+      const mimeType = payload.mimeType || 'application/pdf';
+
+      if (fileData) {
+        // Strip data:mime/type;base64, prefix
+        const cleanBase64 = fileData.replace(/^data:[^;]+;base64,/, '');
         parts.push({
-          inlineData: { mimeType: payload.mimeType, data: cleanBase64 }
+          inlineData: {
+            mimeType: mimeType,
+            data: cleanBase64,
+          },
         });
       }
 
-      const promptText = `
-You are an expert Clinical Health Informatics AI. Analyze this medical report ${payload.patientInfo ? `for patient ${JSON.stringify(payload.patientInfo)}` : ""}.
-Extract all readable laboratory biomarkers, test findings, doctor remarks, date, lab name, and physician notes.
+      if (payload.images && payload.images.length > 0) {
+        for (const img of payload.images) {
+          const cleanBase64 = img.data.replace(/^data:[^;]+;base64,/, '');
+          parts.push({
+            inlineData: { mimeType: img.mimeType, data: cleanBase64 },
+          });
+        }
+      }
 
-Report Context / Text:
-${payload.reportText || "See attached medical report image."}
+      const promptText = `
+You are an expert Clinical Health Informatics AI. Analyze the attached medical document/report ${payload.patientInfo ? `for patient ${JSON.stringify(payload.patientInfo)}` : ''}.
+
+CRITICAL INSTRUCTIONS:
+1. Extract ALL clinical parameters, lab test readings, biomarkers, and measurements found in the document. DO NOT omit any readings. If there are 15 or 30 readings, return all 15 or 30 of them.
+2. If a value is non-numeric (e.g. "Positive", "Negative", "Trace", "120/80"), set "value": null and put the text in "textValue".
+3. If reference ranges or standard intervals are not specified in the document, set "minRef": null, "maxRef": null, and "referenceRangeText": "NA".
+4. Extract the exact Report Title, Category, Lab Name, Doctor Name, and Date.
 
 Return a valid JSON object matching this schema:
 {
-  "title": string (e.g. "Comprehensive Metabolic Panel", "Lipid Profile"),
-  "category": string (e.g. "Blood Test", "Lipid Profile", "Thyroid"),
-  "labName": string (e.g. "Quest Diagnostics", "Labcorp"),
+  "title": string (e.g. "Comprehensive Metabolic Panel", "Complete Blood Count", "Lipid Profile"),
+  "category": "Blood Test" | "Urine Test" | "Lipid Profile" | "Metabolic & Diabetes" | "Thyroid Panel" | "Liver Function (LFT)" | "Kidney Function (KFT)" | "Cardiology & ECG" | "Imaging (X-Ray/MRI/CT)" | "Prescription" | "Clinical Encounter" | "Other",
+  "labName": string,
   "orderingDoctor": string,
   "reportDate": string (YYYY-MM-DD),
   "status": "Normal" | "Needs Attention" | "Critical",
-  "summary": string (2-3 concise sentences in patient-friendly yet clinical clarity),
+  "summary": string (Concise clinical narrative of all key findings),
   "markers": [
     {
-      "name": string (parameter name, e.g. "Fasting Blood Sugar", "HbA1c", "Total Cholesterol"),
-      "value": number (numeric value only if numeric, otherwise null),
-      "textValue": string (e.g. "Negative", "Trace"),
-      "unit": string (e.g. "mg/dL", "%"),
+      "name": string (Exact biomarker name, e.g. "Hemoglobin", "RBC", "WBC", "Platelet Count", "TSH", "Total Cholesterol", "Fasting Glucose", "Creatinine", etc.),
+      "value": number (numeric value only, or null if text/NA),
+      "textValue": string (or "NA" if non-numeric/missing),
+      "unit": string (e.g. "mg/dL", "g/dL", "uIU/mL", "%", or "NA"),
       "minRef": number or null,
       "maxRef": number or null,
-      "referenceRangeText": string (e.g. "70 - 99 mg/dL"),
+      "referenceRangeText": string (e.g. "12.0 - 15.0 g/dL" or "NA"),
       "flag": "Normal" | "Low" | "High" | "Critical"
     }
   ],
@@ -133,18 +144,20 @@ Return a valid JSON object matching this schema:
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.2,
-          }
-        })
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+          },
+        }),
       });
 
       if (!res.ok) {
-        throw new Error(`Gemini API Error: ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(`Gemini API Error: ${res.status} - ${errorData?.error?.message || res.statusText}`);
       }
 
       const json = await res.json();
-      const text = json.candidates[0].content.parts[0].text;
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('No data returned from Gemini API.');
       const data = JSON.parse(text);
 
       return { success: true, data };

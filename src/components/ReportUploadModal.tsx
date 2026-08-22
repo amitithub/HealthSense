@@ -196,8 +196,8 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
     try {
       const result = await AIService.analyzeReport({
         reportText: fileResult?.extractedText || summary || title,
-        imageData: fileResult?.isImage ? fileResult.dataUrl : undefined,
-        mimeType: fileResult?.fileType,
+        imageData: fileResult?.dataUrl, // Send dataUrl regardless of whether it is PDF or image
+        mimeType: fileResult?.fileType || (fileResult?.isPdf ? 'application/pdf' : 'image/jpeg'),
         patientInfo: activeMember
           ? {
               name: activeMember.name,
