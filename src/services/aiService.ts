@@ -138,29 +138,55 @@ Return a valid JSON object matching this schema:
 `;
       parts.push({ text: promptText });
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.1,
-          },
-        }),
-      });
+      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-flash-latest'];
+      let lastError: any = null;
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(`Gemini API Error: ${res.status} - ${errorData?.error?.message || res.statusText}`);
+      for (const modelName of modelsToTry) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts }],
+                  generationConfig: {
+                    responseMimeType: 'application/json',
+                    temperature: 0.1,
+                  },
+                }),
+              }
+            );
+
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({}));
+              const msg = errorData?.error?.message || res.statusText;
+              // If 503 or 429, wait and retry
+              if ((res.status === 503 || res.status === 429) && attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                continue;
+              }
+              throw new Error(`Gemini API Error: ${res.status} - ${msg}`);
+            }
+
+            const json = await res.json();
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error('No data returned from Gemini API.');
+            const data = JSON.parse(text);
+
+            return { success: true, data };
+          } catch (err: any) {
+            lastError = err;
+            // Try next model if 503 deadline expired
+            if (err.message && (err.message.includes('503') || err.message.includes('Deadline'))) {
+              break;
+            }
+          }
+        }
       }
 
-      const json = await res.json();
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('No data returned from Gemini API.');
-      const data = JSON.parse(text);
-
-      return { success: true, data };
+      throw lastError || new Error('Extraction failed after retry attempts.');
     } catch (e: any) {
       console.error('Gemini direct API failed', e);
       throw e;
