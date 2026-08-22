@@ -89,6 +89,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   const [isAnalyzingAI, setIsAnalyzingAI] = useState<boolean>(false);
   const [aiAnalysisError, setAiAnalysisError] = useState<string | null>(null);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
 
   useEffect(() => {
     if (reportToEdit) {
@@ -149,11 +150,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
         setTitle(cleanName);
       }
 
-      // Auto-trigger extraction
-      setTimeout(() => {
-        const btn = document.getElementById('ai-auto-extract-btn');
-        if (btn) btn.click();
-      }, 500);
+      // No auto-trigger, let the user click the AI button if they want to.
     } catch (err) {
       console.error('File parsing error:', err);
     }
@@ -176,11 +173,7 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
         setTitle(cleanName);
       }
 
-      // Auto-trigger extraction
-      setTimeout(() => {
-        const btn = document.getElementById('ai-auto-extract-btn');
-        if (btn) btn.click();
-      }, 500);
+      // No auto-trigger
     } catch (err) {
       console.error('File drop parse error:', err);
     }
@@ -190,13 +183,8 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
   const handleAIExtract = async () => {
     let apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-      const input = window.prompt("To extract real biomarkers from your file on this static site, please enter a Gemini API Key.\nGet one for free at aistudio.google.com/app/apikey");
-      if (!input) {
-        setAiAnalysisError("API Key is required to extract real data. (Falling back to dummy data...)");
-        // We will continue so it runs fallback for demonstration if they cancel
-      } else {
-        localStorage.setItem('gemini_api_key', input.trim());
-      }
+      setAiAnalysisError("API Key is required to extract real data. Add your key in the field above.");
+      return;
     }
 
     setIsAnalyzingAI(true);
@@ -517,6 +505,25 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
                     Instantly extract lab parameters, reference ranges, and doctor notes from uploaded file
                   </p>
                 </div>
+              </div>
+              
+              <div className="flex flex-col gap-2 w-full mt-2">
+                <input
+                  type="password"
+                  placeholder="Paste Gemini API Key (aistudio.google.com)"
+                  className="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-md text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none"
+                  value={apiKey}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setApiKey(val);
+                    if (val) {
+                      localStorage.setItem('gemini_api_key', val.trim());
+                    } else {
+                      localStorage.removeItem('gemini_api_key');
+                    }
+                    setAiSuccessMessage(null);
+                  }}
+                />
               </div>
 
               <button

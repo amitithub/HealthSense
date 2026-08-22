@@ -464,10 +464,15 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
             {/* Chart Area */}
             <div className="h-72 w-full pt-2">
               {allMarkerNames.length === 0 ? (
-                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg">
-                  <AlertCircle className="w-8 h-8 mb-2 text-slate-300" />
-                  <p className="text-sm font-semibold">No Biomarkers Found</p>
-                  <p className="text-xs">The selected reports do not contain any recorded lab metrics to plot.</p>
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg p-6 text-center">
+                  <AlertCircle className="w-8 h-8 mb-2 text-slate-400" />
+                  <p className="text-sm font-bold text-slate-700">No Biomarkers Found in Selected Reports</p>
+                  <p className="text-xs text-slate-500 mt-2 max-w-md">
+                    The reports you selected for comparison do not have any lab markers (like Glucose, HbA1c, etc.) recorded. 
+                  </p>
+                  <p className="text-xs text-indigo-600 font-semibold mt-3">
+                    Tip: Upload a new report and use the "AI Auto-Fill" button with your Gemini API Key to extract real data automatically.
+                  </p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
