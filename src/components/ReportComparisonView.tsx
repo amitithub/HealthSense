@@ -142,11 +142,22 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
 
   // Chart data formatting for Recharts
   const chartData = useMemo(() => {
+    const dateCounts: Record<string, number> = {};
+
     return activeCompareReports.map((report) => {
+      let uniqueDate = report.reportDate;
+      if (dateCounts[uniqueDate] !== undefined) {
+        dateCounts[uniqueDate] += 1;
+        uniqueDate = `${uniqueDate} (V${dateCounts[uniqueDate]})`;
+      } else {
+        dateCounts[uniqueDate] = 1;
+      }
+
       const entry: any = {
-        date: report.reportDate,
+        date: uniqueDate, // Unique label prevents Recharts from merging overlapping points
         title: report.title,
       };
+      
       report.markers.forEach((m) => {
         if (m.value !== null && !isNaN(m.value)) {
           entry[m.name] = m.value;

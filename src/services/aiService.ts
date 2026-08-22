@@ -25,6 +25,7 @@ export interface AIAnalysisResult {
 export class AIService {
   static async analyzeReport(payload: {
     reportText?: string;
+    images?: Array<{ data: string; mimeType: string }>;
     imageData?: string;
     mimeType?: string;
     patientInfo?: {
@@ -35,6 +36,11 @@ export class AIService {
     };
   }): Promise<{ success: boolean; data?: AIAnalysisResult; error?: string }> {
     try {
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (apiKey) {
+        return await this.analyzeWithGeminiAPI(payload, apiKey);
+      }
+
       const response = await fetch('/api/ai/analyze-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,11 +58,89 @@ export class AIService {
       };
     } catch (err: any) {
       console.warn('AI report analysis fallback:', err);
-      // Generate client-side intelligent fallback extraction based on text or default
       return {
         success: true,
         data: this.fallbackLocalAnalyze(payload.reportText),
       };
+    }
+  }
+
+  private static async analyzeWithGeminiAPI(payload: any, apiKey: string): Promise<{ success: boolean; data?: AIAnalysisResult; error?: string }> {
+    try {
+      const parts: any[] = [];
+      
+      if (payload.images && payload.images.length > 0) {
+        for (const img of payload.images) {
+          const cleanBase64 = img.data.replace(/^data:image\/[a-z]+;base64,/, "");
+          parts.push({
+            inlineData: { mimeType: img.mimeType, data: cleanBase64 }
+          });
+        }
+      } else if (payload.imageData && payload.mimeType) {
+        const cleanBase64 = payload.imageData.replace(/^data:image\/[a-z]+;base64,/, "");
+        parts.push({
+          inlineData: { mimeType: payload.mimeType, data: cleanBase64 }
+        });
+      }
+
+      const promptText = `
+You are an expert Clinical Health Informatics AI. Analyze this medical report ${payload.patientInfo ? `for patient ${JSON.stringify(payload.patientInfo)}` : ""}.
+Extract all readable laboratory biomarkers, test findings, doctor remarks, date, lab name, and physician notes.
+
+Report Context / Text:
+${payload.reportText || "See attached medical report image."}
+
+Return a valid JSON object matching this schema:
+{
+  "title": string (e.g. "Comprehensive Metabolic Panel", "Lipid Profile"),
+  "category": string (e.g. "Blood Test", "Lipid Profile", "Thyroid"),
+  "labName": string (e.g. "Quest Diagnostics", "Labcorp"),
+  "orderingDoctor": string,
+  "reportDate": string (YYYY-MM-DD),
+  "status": "Normal" | "Needs Attention" | "Critical",
+  "summary": string (2-3 concise sentences in patient-friendly yet clinical clarity),
+  "markers": [
+    {
+      "name": string (parameter name, e.g. "Fasting Blood Sugar", "HbA1c", "Total Cholesterol"),
+      "value": number (numeric value only if numeric, otherwise null),
+      "textValue": string (e.g. "Negative", "Trace"),
+      "unit": string (e.g. "mg/dL", "%"),
+      "minRef": number or null,
+      "maxRef": number or null,
+      "referenceRangeText": string (e.g. "70 - 99 mg/dL"),
+      "flag": "Normal" | "Low" | "High" | "Critical"
+    }
+  ],
+  "keyFindings": [string],
+  "suggestedDoctorQuestions": [string]
+}
+`;
+      parts.push({ text: promptText });
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+          }
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Gemini API Error: ${res.status}`);
+      }
+
+      const json = await res.json();
+      const text = json.candidates[0].content.parts[0].text;
+      const data = JSON.parse(text);
+
+      return { success: true, data };
+    } catch (e: any) {
+      console.error('Gemini direct API failed', e);
+      throw e;
     }
   }
 

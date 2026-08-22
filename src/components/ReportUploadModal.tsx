@@ -188,6 +188,17 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
 
   // Run AI extraction
   const handleAIExtract = async () => {
+    let apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+      const input = window.prompt("To extract real biomarkers from your file on this static site, please enter a Gemini API Key.\nGet one for free at aistudio.google.com/app/apikey");
+      if (!input) {
+        setAiAnalysisError("API Key is required to extract real data. (Falling back to dummy data...)");
+        // We will continue so it runs fallback for demonstration if they cancel
+      } else {
+        localStorage.setItem('gemini_api_key', input.trim());
+      }
+    }
+
     setIsAnalyzingAI(true);
     setAiAnalysisError(null);
     setAiSuccessMessage(null);
@@ -235,7 +246,11 @@ export const ReportUploadModal: React.FC<ReportUploadModalProps> = ({
           setMarkers(formattedMarkers);
         }
 
-        setAiSuccessMessage(`Successfully extracted ${d.markers?.length || 0} biomarkers & clinical fields!`);
+        if (!localStorage.getItem('gemini_api_key')) {
+          setAiSuccessMessage(`Fallback used: Loaded ${d.markers?.length || 0} dummy biomarkers (Add API key for real data)`);
+        } else {
+          setAiSuccessMessage(`Successfully extracted ${d.markers?.length || 0} biomarkers & clinical fields!`);
+        }
       } else {
         setAiAnalysisError(result.error || 'Could not automatically extract all parameters.');
       }
